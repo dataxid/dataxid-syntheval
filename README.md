@@ -1,16 +1,40 @@
 # dataxid-syntheval
 
-Synthetic data quality evaluation with Polars-native performance.
+Synthetic data quality evaluation — compare original and synthetic datasets with interactive HTML reports.
 
 > **Status:** Early development. Not yet published on PyPI.
 
 ## Quickstart
 
 ```python
+import polars as pl
 from dataxid_syntheval import SynthEval
 
-report = SynthEval(original=real_df, synthetic=syn_df)
+original = pl.read_csv("original.csv")
+synthetic = pl.read_csv("synthetic.csv")
+
+se = SynthEval(original=original, synthetic=synthetic)
+se.to_html("report.html")
 ```
+
+Programmatic access:
+
+```python
+diffs = se.diff
+diffs["column_diffs"]          # per-column stat deltas
+diffs["alert_diff"]            # new / resolved alerts
+diffs["distribution_overlays"] # histogram & frequency overlays
+diffs["correlation_diffs"]     # correlation matrix differences
+```
+
+## Features
+
+- **Column-level stat comparison** — mean, std, median, min/max, missing %, distinct count and more
+- **Alert change detection** — new and resolved data quality alerts between profiles
+- **Distribution overlays** — proportion-based histograms and categorical frequency charts for fair comparison across different dataset sizes
+- **Correlation matrix diffs** — Pearson, Spearman, Kendall, Cramér's V, Phik
+- **Interactive HTML report** — tabbed column comparison, ECharts visualizations, lazy chart rendering
+- Built on [dataxid-profiling](https://github.com/dataxid/dataxid-profiling) and Polars
 
 ## Installation
 
