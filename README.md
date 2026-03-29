@@ -1,8 +1,10 @@
 # dataxid-syntheval
 
-Synthetic data quality evaluation — compare original and synthetic datasets with interactive HTML reports.
+[![PyPI version](https://img.shields.io/pypi/v/dataxid-syntheval.svg)](https://pypi.org/project/dataxid-syntheval/)
+[![Python versions](https://img.shields.io/pypi/pyversions/dataxid-syntheval.svg)](https://pypi.org/project/dataxid-syntheval/)
+[![License](https://img.shields.io/pypi/l/dataxid-syntheval.svg)](https://github.com/dataxid/dataxid-syntheval/blob/main/LICENSE)
 
-> **Status:** Early development. Not yet published on PyPI.
+Synthetic data quality evaluation — compare original and synthetic datasets with interactive HTML reports.
 
 ## Quickstart
 
