@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  {% if icon_b64 %}<link rel="icon" type="image/png" href="data:image/png;base64,{{ icon_b64 }}">{% endif %}
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              teal: '#0d3b3b',
+              'teal-light': '#1a4a4a',
+              coral: '#e8845c',
+              'coral-light': '#f0956a',
+              peach: '#f4a683',
+              purple: '#b06aed',
+              'purple-light': '#c77dff',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .tab-btn { transition: all 0.2s ease; }
+    .tab-btn.active, .tab-btn.active:hover { background: #0d3b3b; color: white; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card { transition: box-shadow 0.2s ease; }
+    .card:hover { box-shadow: 0 4px 12px rgba(13, 59, 59, 0.08); }
+    .stat-row:nth-child(even) { background: #f8fafa; }
+    .delta-pos { color: #dc2626; }
+    .delta-neg { color: #16a34a; }
+    .delta-zero { color: #6b7280; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+  {# ── Header ── #}
+  <header class="bg-[#e8efed] border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-5">
+        {% if logo_b64 %}
+        <a href="https://dataxid.com?utm_source=syntheval-report&amp;utm_medium=html" target="_blank" rel="noopener"><img src="data:image/png;base64,{{ logo_b64 }}" alt="DataXID" class="h-10" /></a>
+        {% endif %}
+        <div class="w-px h-10 bg-brand-teal/20"></div>
+        <div>
+          <h1 class="text-xl font-bold text-brand-teal">{{ title }}</h1>
+          <p class="text-sm text-gray-500 mt-0.5">v{{ version }} &middot; {{ generated_at }}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="text-center">
+          <div class="text-lg font-bold text-brand-teal">{{ "{:,}".format(original_rows) }}</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wider">Original</div>
+        </div>
+        <div class="text-gray-300 text-lg">vs</div>
+        <div class="text-center">
+          <div class="text-lg font-bold text-brand-coral">{{ "{:,}".format(synthetic_rows) }}</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wider">Synthetic</div>
+        </div>
+        <div class="w-px h-8 bg-brand-teal/15"></div>
+        <div class="text-center">
+          <div class="text-lg font-bold text-brand-teal">{{ n_columns }}</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wider">Columns</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    {# ── Column Comparison ── #}
+    {% if columns %}
+    <section>
+      <h2 class="text-lg font-semibold text-brand-teal mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Column Comparison
+      </h2>
+
+      <div class="flex flex-wrap gap-2 mb-5" id="col-tabs">
+        {% for col_name, col in columns.items() %}
+        <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:border-brand-teal hover:text-brand-teal{% if loop.first %} active{% endif %}"
+                onclick="switchTab({{ loop.index0 }}, this)">
+          <span class="mr-1 opacity-60">
+            {% if col.type == 'NUMERIC' %}#
+            {% elif col.type == 'CATEGORICAL' %}Aa
+            {% elif col.type == 'BOOLEAN' %}◉
+            {% elif col.type == 'DATETIME' %}⏱
+            {% else %}?{% endif %}
+          </span>
+          {{ col_name }}
+        </button>
+        {% endfor %}
+      </div>
+
+      {% for col_name, col in columns.items() %}
+      <div class="tab-panel{% if loop.first %} active{% endif %}" id="panel-{{ loop.index0 }}">
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+            <h3 class="text-lg font-bold text-brand-teal">{{ col_name }}</h3>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold
+              {% if col.type == 'NUMERIC' %}bg-blue-50 text-blue-600
+              {% elif col.type == 'CATEGORICAL' %}bg-emerald-50 text-emerald-600
+              {% elif col.type == 'BOOLEAN' %}bg-purple-50 text-purple-600
+              {% elif col.type == 'DATETIME' %}bg-amber-50 text-amber-600
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ col.type }}
+            </span>
+          </div>
+
+          {# ── Chart (full-width) ── #}
+          {% if distribution_charts[col_name] is defined %}
+          <div class="p-6 border-b border-gray-100">
+            {{ distribution_charts[col_name] | safe }}
+          </div>
+          {% endif %}
+
+          {# ── Stats: Original | Synthetic | Delta ── #}
+          <div class="p-6">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200">
+                  <th class="text-left py-2 px-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Statistic</th>
+                  <th class="text-right py-2 px-3 text-xs uppercase tracking-wider font-semibold text-brand-teal">Original</th>
+                  <th class="text-right py-2 px-3 text-xs uppercase tracking-wider font-semibold text-brand-coral">Synthetic</th>
+                  <th class="text-right py-2 px-3 text-xs uppercase tracking-wider text-gray-400 font-semibold">Delta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in col.stats %}
+                <tr class="stat-row{% if not s.primary %} stat-extra{% endif %}"{% if not s.primary %} style="display:none"{% endif %}>
+                  <td class="py-2 px-3 text-gray-600 font-medium rounded-l-lg">{{ s.label }}</td>
+                  <td class="py-2 px-3 text-right text-brand-teal">{{ s.original | format_stat }}</td>
+                  <td class="py-2 px-3 text-right text-brand-coral">{{ s.synthetic | format_stat }}</td>
+                  <td class="py-2 px-3 text-right font-semibold rounded-r-lg
+                    {% if s.delta is not none and s.delta > 0.0001 %}delta-pos
+                    {% elif s.delta is not none and s.delta < -0.0001 %}delta-neg
+                    {% else %}delta-zero{% endif %}">
+                    {{ s.delta | format_delta }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% set extras = col.stats | rejectattr('primary') | list %}
+            {% if extras %}
+            <button class="mt-3 text-sm font-medium text-brand-teal hover:text-brand-coral transition-colors"
+                    onclick="toggleStats(this)">
+              Show {{ extras | length }} more ▾
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {# ── Alert Changes ── #}
+    {% if alert_diff.new or alert_diff.resolved %}
+    <section>
+      <h2 class="text-lg font-semibold text-brand-teal mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-brand-coral" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        Alert Changes
+      </h2>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% if alert_diff.new %}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-red-500 text-white">{{ alert_diff.new | length }}</span>
+            <span class="text-sm font-semibold text-red-700">New Alerts</span>
+            <span class="text-xs text-red-400">(in synthetic only)</span>
+          </div>
+          <table class="w-full text-sm">
+            <tbody>
+              {% for a in alert_diff.new %}
+              <tr class="border-b border-gray-50 hover:bg-gray-50">
+                <td class="px-5 py-3 font-mono text-sm text-brand-teal font-medium">{{ a.column or 'dataset' }}</td>
+                <td class="px-5 py-3"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-600 ring-1 ring-red-200">{{ a.alert_type }}</span></td>
+                <td class="px-5 py-3 text-xs text-gray-500">{% if a.value is not none %}{{ a.value | format_alert_value }}{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% if alert_diff.resolved %}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 bg-green-50 border-b border-green-100 flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">{{ alert_diff.resolved | length }}</span>
+            <span class="text-sm font-semibold text-green-700">Resolved Alerts</span>
+            <span class="text-xs text-green-400">(in original only)</span>
+          </div>
+          <table class="w-full text-sm">
+            <tbody>
+              {% for a in alert_diff.resolved %}
+              <tr class="border-b border-gray-50 hover:bg-gray-50">
+                <td class="px-5 py-3 font-mono text-sm text-brand-teal font-medium">{{ a.column or 'dataset' }}</td>
+                <td class="px-5 py-3"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-green-50 text-green-600 ring-1 ring-green-200">{{ a.alert_type }}</span></td>
+                <td class="px-5 py-3 text-xs text-gray-500">{% if a.value is not none %}{{ a.value | format_alert_value }}{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    {# ── Correlation Diffs ── #}
+    {% if correlation_diff_charts %}
+    <section>
+      <h2 class="text-lg font-semibold text-brand-teal mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+        Correlation Diffs
+        <span class="text-xs font-normal text-gray-400">(original − synthetic)</span>
+      </h2>
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="flex gap-2 px-6 pt-4" id="corr-tabs">
+          {% for chart in correlation_diff_charts %}
+          <button class="tab-btn px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:border-brand-teal hover:text-brand-teal{% if loop.first %} active{% endif %}"
+                  onclick="switchCorrTab('{{ chart.div_id }}', this)">{{ chart.name }}</button>
+          {% endfor %}
+        </div>
+        {% for chart in correlation_diff_charts %}
+        <div class="corr-panel p-6{% if not loop.first %} hidden{% endif %}" id="panel-{{ chart.div_id }}">
+          {{ chart.chart_html | safe }}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  </main>
+
+  {# ── Footer ── #}
+  <footer class="mt-12 border-t-2 border-brand-teal/10">
+    <div class="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        {% if icon_b64 %}
+        <img src="data:image/png;base64,{{ icon_b64 }}" alt="DataXID" class="h-6 w-6" />
+        {% endif %}
+        <span class="text-sm text-gray-400">
+          Powered by
+          <a href="https://github.com/dataxid/dataxid-syntheval" class="font-semibold text-brand-teal hover:text-brand-coral transition-colors">dataxid-syntheval</a>
+        </span>
+      </div>
+      <span class="text-xs text-gray-300">Synthetic data quality evaluation</span>
+    </div>
+  </footer>
+
+  {# ── JS ── #}
+  <script>
+    function initChart(el) {
+      if (el._echartInit) return;
+      var raw = el.getAttribute('data-option');
+      if (!raw) return;
+      var opt = JSON.parse(raw);
+      if (el.getAttribute('data-has-fn') === '1') {
+        if (opt.tooltip) opt.tooltip.formatter = function(p){
+          return p.name+' vs '+p.data[1]+': '+p.data[2];
+        };
+      }
+      if (el.getAttribute('data-has-bar-tooltip') === '1') {
+        if (opt.tooltip) opt.tooltip.formatter = function(params) {
+          var lines = params.map(function(p) {
+            var d = p.data, pct = (typeof d === 'object' && d.value !== undefined) ? d.value : d;
+            var cnt = (typeof d === 'object' && d.count !== undefined) ? ' (n=' + d.count.toLocaleString() + ')' : '';
+            return p.marker + ' ' + p.seriesName + ': ' + pct.toFixed(1) + '%' + cnt;
+          });
+          return '<b>' + params[0].axisValue + '</b><br>' + lines.join('<br>');
+        };
+        if (opt.yAxis) opt.yAxis.axisLabel = {formatter: function(v){return v+'%';}};
+      }
+      echarts.init(el).setOption(opt);
+      el._echartInit = true;
+    }
+    function initChartsIn(container) {
+      container.querySelectorAll('.echart-lazy').forEach(initChart);
+    }
+    function switchTab(idx, btn) {
+      document.querySelectorAll('#col-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      var panel = document.getElementById('panel-' + idx);
+      if (panel) { panel.classList.add('active'); initChartsIn(panel); }
+    }
+    function switchCorrTab(divId, btn) {
+      document.querySelectorAll('#corr-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.corr-panel').forEach(p => p.classList.add('hidden'));
+      btn.classList.add('active');
+      var panel = document.getElementById('panel-' + divId);
+      if (panel) { panel.classList.remove('hidden'); initChartsIn(panel); }
+    }
+    function toggleStats(btn) {
+      var table = btn.previousElementSibling;
+      var extras = table.querySelectorAll('.stat-extra');
+      var showing = extras[0] && extras[0].style.display !== 'none';
+      extras.forEach(function(tr) { tr.style.display = showing ? 'none' : ''; });
+      var n = extras.length;
+      btn.textContent = showing ? 'Show ' + n + ' more ▾' : 'Show less ▴';
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.tab-panel.active, .corr-panel:not(.hidden)').forEach(initChartsIn);
+    });
+  </script>
+
+</body>
+</html>

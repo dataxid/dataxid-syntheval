@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dataxid_syntheval._config import SynthEvalConfig
+from dataxid_syntheval._diff import (
+    compute_alert_diff,
+    compute_column_diffs,
+    compute_correlation_diffs,
+    compute_distribution_overlays,
+)
 from dataxid_syntheval._ingest import ingest
+from dataxid_syntheval._report._html import render_html
 
 if TYPE_CHECKING:
     from dataxid_profiling import ProfileReport
@@ -19,8 +27,9 @@ class SynthEval:
     """Main entry point for synthetic data evaluation.
 
     Usage:
-        report = SynthEval(original=real_df, synthetic=syn_df)
-        report = SynthEval(original=real_profile, synthetic=syn_profile)
+        se = SynthEval(original=real_df, synthetic=syn_df)
+        se.diff                 # programmatic access
+        se.to_html("report.html")  # interactive HTML report
     """
 
     def __init__(
@@ -38,6 +47,7 @@ class SynthEval:
 
         self._original_report: ProfileReport = ingest(original, self._config)
         self._synthetic_report: ProfileReport = ingest(synthetic, self._config)
+        self._diff_cache: dict[str, Any] | None = None
 
     @property
     def config(self) -> SynthEvalConfig:
@@ -50,6 +60,47 @@ class SynthEval:
     @property
     def synthetic_report(self) -> ProfileReport:
         return self._synthetic_report
+
+    @property
+    def diff(self) -> dict[str, Any]:
+        """Lazily computed comparison results.
+
+        Returns a dict with keys: column_diffs, alert_diff,
+        distribution_overlays, correlation_diffs.
+        """
+        if self._diff_cache is None:
+            orig = self._original_report
+            syn = self._synthetic_report
+            self._diff_cache = {
+                "column_diffs": compute_column_diffs(orig, syn),
+                "alert_diff": compute_alert_diff(orig, syn),
+                "distribution_overlays": compute_distribution_overlays(orig, syn),
+                "correlation_diffs": compute_correlation_diffs(orig, syn),
+            }
+        return self._diff_cache
+
+    def to_html(self, path: str | Path | None = None) -> str:
+        """Render the comparison as a self-contained HTML report.
+
+        If *path* is given the HTML is also written to that file.
+        Always returns the HTML string.
+        """
+        d = self.diff
+        html = render_html(
+            title=self._config.title,
+            version=__version__,
+            column_diffs=d["column_diffs"],
+            alert_diff=d["alert_diff"],
+            distribution_overlays=d["distribution_overlays"],
+            correlation_diffs=d["correlation_diffs"],
+            original_stats=self._original_report.stats,
+            synthetic_stats=self._synthetic_report.stats,
+            original_rows=self._original_report.df.height,
+            synthetic_rows=self._synthetic_report.df.height,
+        )
+        if path is not None:
+            Path(path).write_text(html, encoding="utf-8")
+        return html
 
     def __repr__(self) -> str:
         return (

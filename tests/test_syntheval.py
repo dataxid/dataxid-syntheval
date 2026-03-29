@@ -71,3 +71,78 @@ class TestSynthEvalRepr:
         assert "Test" in text
         assert "original_rows=100" in text
         assert "synthetic_rows=100" in text
+
+
+class TestSynthEvalDiff:
+    def test_diff_returns_dict(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        d = se.diff
+        assert isinstance(d, dict)
+        assert "column_diffs" in d
+        assert "alert_diff" in d
+        assert "distribution_overlays" in d
+        assert "correlation_diffs" in d
+
+    def test_diff_is_cached(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        d1 = se.diff
+        d2 = se.diff
+        assert d1 is d2
+
+    def test_diff_column_diffs_has_columns(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        cd = se.diff["column_diffs"]
+        assert "age" in cd
+        assert "income" in cd
+        assert "city" in cd
+
+    def test_diff_alert_diff_structure(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        ad = se.diff["alert_diff"]
+        assert "new" in ad
+        assert "resolved" in ad
+
+
+class TestSynthEvalToHtml:
+    def test_to_html_returns_string(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        html = se.to_html()
+        assert isinstance(html, str)
+        assert "<!DOCTYPE html>" in html
+
+    def test_to_html_contains_title(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(
+            original=original_report, synthetic=synthetic_report, title="My Report"
+        )
+        html = se.to_html()
+        assert "My Report" in html
+
+    def test_to_html_writes_file(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport, tmp_path
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        out = tmp_path / "report.html"
+        html = se.to_html(out)
+        assert out.exists()
+        assert out.read_text(encoding="utf-8") == html
+
+    def test_to_html_contains_charts(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        se = SynthEval(original=original_report, synthetic=synthetic_report)
+        html = se.to_html()
+        assert "echarts.init" in html
+        assert "Original" in html
+        assert "Synthetic" in html
