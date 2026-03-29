@@ -9,7 +9,10 @@ from dataxid_syntheval._diff import (
     compute_alert_diff,
     compute_column_diffs,
     compute_correlation_diffs,
+    compute_correlation_matrices,
     compute_distribution_overlays,
+    compute_interaction_overlays,
+    compute_overview_diff,
 )
 
 if TYPE_CHECKING:
@@ -314,3 +317,138 @@ class TestCorrelationDiffs:
                     val = df[label][i]
                     if val is not None:
                         assert val == pytest.approx(0.0, abs=1e-12)
+
+
+class TestCorrelationMatrices:
+    def test_returns_dict_with_orig_and_syn(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        matrices = compute_correlation_matrices(original_report, synthetic_report)
+        assert isinstance(matrices, dict)
+        for method, pair in matrices.items():
+            assert isinstance(method, str)
+            assert "original" in pair
+            assert "synthetic" in pair
+            assert isinstance(pair["original"], pl.DataFrame)
+            assert isinstance(pair["synthetic"], pl.DataFrame)
+
+    def test_shared_methods_match_diffs(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        matrices = compute_correlation_matrices(original_report, synthetic_report)
+        diffs = compute_correlation_diffs(original_report, synthetic_report)
+        assert set(matrices.keys()) == set(diffs.keys())
+
+    def test_matrices_are_square(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        matrices = compute_correlation_matrices(original_report, synthetic_report)
+        for pair in matrices.values():
+            for key in ("original", "synthetic"):
+                df = pair[key]
+                numeric_cols = [c for c in df.columns if c != "column"]
+                assert df.height == len(numeric_cols)
+
+    def test_identical_profiles_same_matrices(self, original_report: ProfileReport):
+        matrices = compute_correlation_matrices(original_report, original_report)
+        for pair in matrices.values():
+            orig_df = pair["original"]
+            syn_df = pair["synthetic"]
+            numeric_cols = [c for c in orig_df.columns if c != "column"]
+            for col in numeric_cols:
+                for o, s in zip(
+                    orig_df[col].to_list(), syn_df[col].to_list(), strict=True
+                ):
+                    if o is not None and s is not None:
+                        assert o == pytest.approx(s, abs=1e-12)
+
+
+class TestOverviewDiff:
+    def test_returns_expected_fields(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        diff = compute_overview_diff(original_report, synthetic_report)
+        assert "n_rows" in diff
+        assert "n_columns" in diff
+        assert "missing_cells_pct" in diff
+        assert "duplicate_rows_pct" in diff
+        assert "type_distribution" in diff
+
+    def test_each_field_has_original_synthetic_delta(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        diff = compute_overview_diff(original_report, synthetic_report)
+        for _field, vals in diff.items():
+            assert "original" in vals
+            assert "synthetic" in vals
+            assert "delta" in vals
+
+    def test_numeric_deltas_are_numbers(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        diff = compute_overview_diff(original_report, synthetic_report)
+        for field in ("n_rows", "n_columns", "missing_cells_pct", "duplicate_rows_pct"):
+            d = diff[field]["delta"]
+            assert d is None or isinstance(d, (int, float))
+
+    def test_identical_profiles_zero_delta(
+        self, original_report: ProfileReport
+    ):
+        diff = compute_overview_diff(original_report, original_report)
+        for field in ("n_rows", "n_columns", "missing_cells", "missing_cells_pct"):
+            assert diff[field]["delta"] == 0
+
+
+class TestInteractionOverlays:
+    def test_returns_expected_keys(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        result = compute_interaction_overlays(original_report, synthetic_report)
+        assert "numeric_columns" in result
+        assert "categorical_columns" in result
+        assert "original_numeric_data" in result
+        assert "synthetic_numeric_data" in result
+        assert "original_boxplot_stats" in result
+        assert "synthetic_boxplot_stats" in result
+
+    def test_numeric_columns_are_shared(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        result = compute_interaction_overlays(original_report, synthetic_report)
+        assert isinstance(result["numeric_columns"], list)
+        assert len(result["numeric_columns"]) > 0
+
+    def test_numeric_data_has_values(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        result = compute_interaction_overlays(original_report, synthetic_report)
+        for col in result["numeric_columns"]:
+            assert col in result["original_numeric_data"]
+            assert col in result["synthetic_numeric_data"]
+            assert isinstance(result["original_numeric_data"][col], list)
+
+    def test_boxplot_stats_structure(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        result = compute_interaction_overlays(original_report, synthetic_report)
+        for _cat_col, num_dict in result["original_boxplot_stats"].items():
+            assert isinstance(num_dict, dict)
+            for _num_col, groups in num_dict.items():
+                assert isinstance(groups, list)
+                for g in groups:
+                    for key in ("category", "min", "q1", "median", "q3", "max", "outliers"):
+                        assert key in g
+
+    def test_identical_profiles_same_numeric_data(
+        self, original_report: ProfileReport
+    ):
+        result = compute_interaction_overlays(original_report, original_report)
+        for col in result["numeric_columns"]:
+            assert result["original_numeric_data"][col] == result["synthetic_numeric_data"][col]
+
+    def test_empty_when_no_interactions(
+        self, original_report: ProfileReport, synthetic_report: ProfileReport
+    ):
+        result = compute_interaction_overlays(original_report, synthetic_report)
+        assert isinstance(result["numeric_columns"], list)
+        assert isinstance(result["categorical_columns"], list)

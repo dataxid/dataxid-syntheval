@@ -13,14 +13,21 @@ if TYPE_CHECKING:
 
 # Numeric fields where delta = original - synthetic is meaningful
 _NUMERIC_DELTA_FIELDS = (
-    "mean", "std", "median", "min", "max", "range",
-    "q25", "q75", "p5", "p95", "iqr", "skewness", "kurtosis",
-    "missing_pct", "distinct_count", "distinct_pct", "zeros_pct",
+    "mean", "std", "variance", "median", "min", "max", "range", "sum",
+    "q25", "q75", "p5", "p95", "iqr", "cv", "mad",
+    "skewness", "kurtosis",
+    "missing_pct", "distinct_count", "distinct_pct",
+    "zeros_pct", "negative_pct",
 )
 
-_CATEGORICAL_DELTA_FIELDS = ("missing_pct", "distinct_count", "distinct_pct")
+_CATEGORICAL_DELTA_FIELDS = (
+    "missing_pct", "distinct_count", "distinct_pct", "imbalance",
+    "length_min", "length_max", "length_mean",
+)
 
-_BOOLEAN_DELTA_FIELDS = ("missing_pct", "true_pct", "false_pct")
+_BOOLEAN_DELTA_FIELDS = (
+    "missing_pct", "true_pct", "false_pct", "true_count", "false_count",
+)
 
 _DATETIME_DELTA_FIELDS = ("missing_pct", "distinct_count", "distinct_pct")
 
@@ -87,6 +94,42 @@ def _compute_deltas(
 
 
 # -- Alert diff ---------------------------------------------------------------
+
+
+_OVERVIEW_FIELDS = (
+    "n_rows", "n_columns", "missing_cells", "missing_cells_pct",
+    "duplicate_rows", "duplicate_rows_pct",
+)
+
+
+def compute_overview_diff(
+    original: ProfileReport,
+    synthetic: ProfileReport,
+) -> dict[str, dict[str, Any]]:
+    """Compare dataset-level overview stats.
+
+    Returns {field: {original, synthetic, delta}} for each overview metric.
+    """
+    orig_ov = original.overview
+    syn_ov = synthetic.overview
+
+    result: dict[str, dict[str, Any]] = {}
+    for field in _OVERVIEW_FIELDS:
+        o = orig_ov.get(field)
+        s = syn_ov.get(field)
+        delta = None
+        if isinstance(o, (int, float)) and isinstance(s, (int, float)):
+            delta = round(s - o, 6)
+        result[field] = {"original": o, "synthetic": s, "delta": delta}
+
+    orig_types = orig_ov.get("type_distribution", {})
+    syn_types = syn_ov.get("type_distribution", {})
+    result["type_distribution"] = {
+        "original": orig_types,
+        "synthetic": syn_types,
+        "delta": None,
+    }
+    return result
 
 
 def _alert_key(alert: Alert) -> tuple[str | None, str]:
@@ -291,6 +334,56 @@ def compute_correlation_diffs(
     return result
 
 
+def compute_correlation_matrices(
+    original: ProfileReport,
+    synthetic: ProfileReport,
+) -> dict[str, dict[str, pl.DataFrame]]:
+    """Extract raw correlation matrices for shared methods.
+
+    Returns {method: {"original": df, "synthetic": df}} where each DataFrame
+    contains only columns shared by both profiles.
+    """
+    orig_corrs = original.correlations
+    syn_corrs = synthetic.correlations
+    shared_methods = [m for m in orig_corrs if m in syn_corrs]
+
+    result: dict[str, dict[str, pl.DataFrame]] = {}
+    for method in shared_methods:
+        pair = _extract_shared_matrices(orig_corrs[method], syn_corrs[method])
+        if pair is not None:
+            result[method] = pair
+
+    return result
+
+
+def _extract_shared_matrices(
+    orig: CorrelationResult,
+    syn: CorrelationResult,
+) -> dict[str, pl.DataFrame] | None:
+    """Align two correlation matrices on shared columns and return both."""
+    orig_cols = [c for c in orig.matrix.columns if c != "column"]
+    syn_cols = [c for c in syn.matrix.columns if c != "column"]
+    shared = [c for c in orig_cols if c in syn_cols]
+    if not shared:
+        return None
+
+    orig_rows = {row["column"]: row for row in orig.matrix.iter_rows(named=True)}
+    syn_rows = {row["column"]: row for row in syn.matrix.iter_rows(named=True)}
+    shared_rows = [c for c in shared if c in orig_rows and c in syn_rows]
+
+    def _build_df(rows_map: dict[str, Any]) -> pl.DataFrame:
+        rows: list[dict[str, Any]] = []
+        for row_name in shared_rows:
+            entry: dict[str, Any] = {"column": row_name}
+            for col_name in shared:
+                val = rows_map[row_name].get(col_name)
+                entry[col_name] = float(val) if val is not None else None
+            rows.append(entry)
+        return pl.DataFrame(rows)
+
+    return {"original": _build_df(orig_rows), "synthetic": _build_df(syn_rows)}
+
+
 def _subtract_matrices(
     orig: CorrelationResult,
     syn: CorrelationResult,
@@ -319,3 +412,103 @@ def _subtract_matrices(
         rows.append(entry)
 
     return pl.DataFrame(rows)
+
+
+# -- Interaction overlays -----------------------------------------------------
+
+_SCATTER_SAMPLE = 1500
+
+
+def compute_interaction_overlays(
+    original: ProfileReport,
+    synthetic: ProfileReport,
+) -> dict[str, Any]:
+    """Build raw interaction data for dynamic JS rendering.
+
+    Returns a dict with:
+      numeric_columns, categorical_columns,
+      original_numeric_data, synthetic_numeric_data  (col → sampled float list),
+      original_boxplot_stats, synthetic_boxplot_stats (cat → num → group list).
+    """
+    orig_inter = original.interactions
+    syn_inter = synthetic.interactions
+    empty: dict[str, Any] = {
+        "numeric_columns": [],
+        "categorical_columns": [],
+        "original_numeric_data": {},
+        "synthetic_numeric_data": {},
+        "original_boxplot_stats": {},
+        "synthetic_boxplot_stats": {},
+    }
+    if orig_inter is None or syn_inter is None:
+        return empty
+
+    shared_num = [c for c in orig_inter.numeric_columns if c in syn_inter.numeric_columns]
+    shared_cat = [
+        c for c in orig_inter.categorical_columns
+        if c in syn_inter.categorical_columns
+    ]
+
+    orig_num = _downsample_numeric_data(orig_inter.numeric_data, shared_num)
+    syn_num = _downsample_numeric_data(syn_inter.numeric_data, shared_num)
+    orig_box = _serialize_boxplot_stats(orig_inter.boxplot_stats, shared_cat, shared_num)
+    syn_box = _serialize_boxplot_stats(syn_inter.boxplot_stats, shared_cat, shared_num)
+
+    return {
+        "numeric_columns": shared_num,
+        "categorical_columns": shared_cat,
+        "original_numeric_data": orig_num,
+        "synthetic_numeric_data": syn_num,
+        "original_boxplot_stats": orig_box,
+        "synthetic_boxplot_stats": syn_box,
+    }
+
+
+def _downsample_numeric_data(
+    numeric_data: dict[str, list[float]],
+    columns: list[str],
+) -> dict[str, list[float]]:
+    """Downsample each column's values to _SCATTER_SAMPLE."""
+    result: dict[str, list[float]] = {}
+    for col in columns:
+        vals = numeric_data.get(col, [])
+        n = len(vals)
+        if n <= _SCATTER_SAMPLE:
+            result[col] = vals
+        else:
+            step = n / _SCATTER_SAMPLE
+            result[col] = [vals[int(i * step)] for i in range(_SCATTER_SAMPLE)]
+    return result
+
+
+def _serialize_boxplot_stats(
+    boxplot_stats: dict[str, Any],
+    cat_columns: list[str],
+    num_columns: list[str],
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Convert BoxPlotGroup objects to plain dicts, keyed by cat → num."""
+    result: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for cat_col in cat_columns:
+        cat_data = boxplot_stats.get(cat_col, {})
+        if not cat_data:
+            continue
+        num_dict: dict[str, list[dict[str, Any]]] = {}
+        for num_col in num_columns:
+            groups = cat_data.get(num_col, [])
+            if not groups:
+                continue
+            num_dict[num_col] = [
+                {
+                    "category": g.category,
+                    "min": g.min,
+                    "q1": g.q1,
+                    "median": g.median,
+                    "q3": g.q3,
+                    "max": g.max,
+                    "outliers": getattr(g, "outliers", []),
+                }
+                for g in groups
+            ]
+        if num_dict:
+            result[cat_col] = num_dict
+    return result

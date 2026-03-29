@@ -14,7 +14,8 @@ BRAND_PURPLE = "#b06aed"
 BRAND_PEACH = "#f4a683"
 
 CHART_HEIGHT = "400px"
-HEATMAP_HEIGHT = "420px"
+HEATMAP_MIN_HEIGHT = 450
+HEATMAP_PX_PER_LABEL = 45
 
 
 def _short_number(val: float | int | str) -> str:
@@ -199,12 +200,13 @@ def diff_heatmap(
         ],
     }
 
+    dyn_height = max(HEATMAP_MIN_HEIGHT, len(y_labels) * HEATMAP_PX_PER_LABEL + 100)
     option_json = json.dumps(option, ensure_ascii=False)
     escaped = option_json.replace("&", "&amp;").replace('"', "&quot;")
 
     return (
         f'<div id="{div_id}" class="echart-lazy" '
-        f'style="width:100%;height:{HEATMAP_HEIGHT}" '
+        f'style="width:100%;height:{dyn_height}px" '
         f'data-option="{escaped}" data-has-fn="1"></div>'
     )
 

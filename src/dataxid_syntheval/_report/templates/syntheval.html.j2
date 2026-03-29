@@ -30,6 +30,7 @@
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .tab-btn { transition: all 0.2s ease; }
     .tab-btn.active, .tab-btn.active:hover { background: #0d3b3b; color: white; }
+    .corr-sub-btn.active, .corr-sub-btn.active:hover { background: #0d3b3b; color: white; border-color: #0d3b3b; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
     .card { transition: box-shadow 0.2s ease; }
@@ -76,6 +77,38 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    {# ── Dataset Overview ── #}
+    {% if overview %}
+    <section>
+      <h2 class="text-lg font-semibold text-brand-teal mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Dataset Overview
+      </h2>
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="text-left py-3 px-5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Metric</th>
+              <th class="text-right py-3 px-5 text-xs uppercase tracking-wider font-semibold text-brand-teal">Original</th>
+              <th class="text-right py-3 px-5 text-xs uppercase tracking-wider font-semibold text-brand-coral">Synthetic</th>
+              <th class="text-right py-3 px-5 text-xs uppercase tracking-wider text-gray-400 font-semibold">Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in overview %}
+            <tr class="stat-row border-b border-gray-50">
+              <td class="py-3 px-5 text-gray-600 font-medium">{{ row.label }}</td>
+              <td class="py-3 px-5 text-right text-brand-teal font-medium">{{ row.original }}</td>
+              <td class="py-3 px-5 text-right text-brand-coral font-medium">{{ row.synthetic }}</td>
+              <td class="py-3 px-5 text-right text-gray-500">{{ row.delta }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
 
     {# ── Column Comparison ── #}
     {% if columns %}
@@ -217,24 +250,302 @@
     </section>
     {% endif %}
 
-    {# ── Correlation Diffs ── #}
-    {% if correlation_diff_charts %}
+    {# ── Interactions ── #}
+    {% if interactions %}
+    <section>
+      <h2 class="text-lg font-semibold text-brand-teal mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+        Interactions
+        <span class="text-xs font-normal text-gray-400">(original vs synthetic overlay)</span>
+      </h2>
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="flex flex-wrap items-center gap-4 px-6 pt-5 pb-3">
+          <div class="flex items-center gap-2">
+            <label for="interact-x" class="text-sm font-medium text-gray-500">X</label>
+            <select id="interact-x" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 focus:border-brand-teal focus:ring-1 focus:ring-brand-teal focus:outline-none">
+              {% for col in interactions.numeric_columns %}
+              <option value="{{ col }}" data-type="numeric"{% if loop.first %} selected{% endif %}>{{ col }} (#)</option>
+              {% endfor %}
+              {% for col in interactions.categorical_columns %}
+              <option value="{{ col }}" data-type="categorical">{{ col }} (Aa)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="interact-y" class="text-sm font-medium text-gray-500">Y</label>
+            <select id="interact-y" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 focus:border-brand-teal focus:ring-1 focus:ring-brand-teal focus:outline-none">
+              {% for col in interactions.numeric_columns %}
+              <option value="{{ col }}" data-type="numeric"{% if loop.index0 == 1 %} selected{% elif loop.first and interactions.numeric_columns | length == 1 %} selected{% endif %}>{{ col }} (#)</option>
+              {% endfor %}
+              {% for col in interactions.categorical_columns %}
+              <option value="{{ col }}" data-type="categorical">{{ col }} (Aa)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div id="interact-msg" class="text-sm text-gray-400 italic hidden"></div>
+        </div>
+        <div id="interact-chart" style="width:100%;height:450px" class="px-6 pb-6"></div>
+      </div>
+    </section>
+
+    <script>
+    (function(){
+      var origNum = {{ interactions.orig_numeric_json | safe }};
+      var synNum  = {{ interactions.syn_numeric_json | safe }};
+      var origBox = {{ interactions.orig_boxplot_json | safe }};
+      var synBox  = {{ interactions.syn_boxplot_json | safe }};
+      var numCols = {{ interactions.numeric_columns | tojson }};
+      var catCols = {{ interactions.categorical_columns | tojson }};
+      var selX = document.getElementById('interact-x');
+      var selY = document.getElementById('interact-y');
+      var chartDom = document.getElementById('interact-chart');
+      var msgEl = document.getElementById('interact-msg');
+      var chart = null;
+
+      function fmtNum(v) {
+        if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1) + 'M';
+        if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1) + 'K';
+        return Number.isInteger(v) ? v.toString() : v.toFixed(2);
+      }
+      function fmtAxis(v) {
+        if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(0) + 'M';
+        if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(0) + 'K';
+        return v;
+      }
+
+      function getType(sel) {
+        return sel.options[sel.selectedIndex].getAttribute('data-type');
+      }
+      function buildOptions(cols, type, symbol) {
+        return cols.map(function(c) {
+          return '<option value="' + c + '" data-type="' + type + '">' + c + ' (' + symbol + ')</option>';
+        }).join('');
+      }
+
+      function updateYOptions() {
+        var xCol = selX.value;
+        var xType = getType(selX);
+        var prev = selY.value;
+        var avail = numCols.filter(function(c) { return c !== xCol; });
+        var html = buildOptions(avail, 'numeric', '#');
+        if (xType === 'numeric') {
+          html += buildOptions(catCols, 'categorical', 'Aa');
+        }
+        selY.innerHTML = html;
+        var found = false;
+        for (var i = 0; i < selY.options.length; i++) {
+          if (selY.options[i].value === prev) { selY.selectedIndex = i; found = true; break; }
+        }
+        if (!found && selY.options.length > 0) selY.selectedIndex = 0;
+      }
+
+      function renderInteraction() {
+        var xCol = selX.value, yCol = selY.value;
+        var xType = getType(selX), yType = getType(selY);
+        msgEl.classList.add('hidden');
+        msgEl.textContent = '';
+        if (xCol === yCol) {
+          msgEl.textContent = 'Select two different columns.';
+          msgEl.classList.remove('hidden');
+          if (chart) chart.clear();
+          return;
+        }
+        if (!chart) chart = echarts.init(chartDom);
+        chart.clear();
+        if (xType === 'numeric' && yType === 'numeric') {
+          renderScatter(xCol, yCol);
+        } else {
+          var catCol = xType === 'categorical' ? xCol : yCol;
+          var numCol = xType === 'categorical' ? yCol : xCol;
+          var flipped = (yType === 'categorical');
+          renderBoxPlot(catCol, numCol, flipped);
+        }
+      }
+
+      function renderScatter(xCol, yCol) {
+        var w = chartDom.clientWidth || 800;
+        var h = Math.max(450, Math.min(w * 0.6, 650));
+        chartDom.style.height = h + 'px';
+        chart.resize();
+
+        var oX = origNum[xCol] || [], oY = origNum[yCol] || [];
+        var sX = synNum[xCol] || [], sY = synNum[yCol] || [];
+        var oLen = Math.min(oX.length, oY.length);
+        var sLen = Math.min(sX.length, sY.length);
+        var origData = new Array(oLen);
+        for (var i = 0; i < oLen; i++) origData[i] = [oX[i], oY[i]];
+        var synData = new Array(sLen);
+        for (var j = 0; j < sLen; j++) synData[j] = [sX[j], sY[j]];
+
+        var total = oLen + sLen;
+        var sz = total > 50000 ? 2 : total > 10000 ? 3 : total > 1000 ? 4 : 5;
+        var isLarge = total > 4000;
+
+        var oOp = 0.45, sOp = 0.45;
+        chart.setOption({
+          animation: false,
+          title: {text: xCol + '  vs  ' + yCol, left: 'center', textStyle: {fontSize: 13}},
+          legend: {data: ['Original', 'Synthetic'], top: '2%', left: 80},
+          tooltip: isLarge ? {show: false} : {trigger: 'item', formatter: function(p) {
+            return p.seriesName + '<br>' + xCol + ': ' + fmtNum(p.data[0]) + '<br>' + yCol + ': ' + fmtNum(p.data[1]);
+          }},
+          toolbox: {right: 10, top: 0, feature: {dataZoom: {title: {zoom: 'Zoom', back: 'Reset'}}, restore: {title: 'Reset'}}},
+          grid: {left: '12%', right: '5%', bottom: '12%', top: '16%'},
+          xAxis: {type: 'value', name: xCol, nameLocation: 'center', nameGap: 30, nameTextStyle: {fontSize: 12, fontWeight: 'bold'}, axisLabel: {formatter: fmtAxis}},
+          yAxis: {type: 'value', name: yCol, nameLocation: 'center', nameGap: 50, nameTextStyle: {fontSize: 12, fontWeight: 'bold'}, axisLabel: {formatter: fmtAxis}},
+          dataZoom: [
+            {type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: false, moveOnMouseWheel: false},
+            {type: 'inside', yAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: false, moveOnMouseWheel: false}
+          ],
+          series: [
+            {name: 'Original', type: 'scatter', data: origData, large: true, largeThreshold: 50000, symbol: 'circle', symbolSize: sz, itemStyle: {color: 'rgba(13,59,59,' + oOp + ')'}, emphasis: {disabled: isLarge}},
+            {name: 'Synthetic', type: 'scatter', data: synData, large: true, largeThreshold: 50000, symbol: 'circle', symbolSize: sz, itemStyle: {color: 'rgba(232,132,92,' + sOp + ')'}, emphasis: {disabled: isLarge}}
+          ]
+        }, true);
+
+        chart.off('restore');
+        chart.on('restore', function() {
+          chart.setOption({series: [
+            {symbolSize: sz, itemStyle: {color: 'rgba(13,59,59,' + oOp + ')'}},
+            {symbolSize: sz, itemStyle: {color: 'rgba(232,132,92,' + sOp + ')'}}
+          ]});
+        });
+
+        var zoomTimer = null;
+        chart.off('datazoom');
+        chart.on('datazoom', function() {
+          if (zoomTimer) clearTimeout(zoomTimer);
+          zoomTimer = setTimeout(function() {
+            var dz = chart.getOption().dataZoom;
+            var xSpan = (dz[0].end - dz[0].start) / 100;
+            var ySpan = (dz[1].end - dz[1].start) / 100;
+            var zoom = 1 / Math.max(Math.min(xSpan, ySpan), 0.01);
+            var newSz = Math.min(Math.max(sz * Math.sqrt(zoom), sz), 14);
+            var newOp = Math.min(oOp + 0.08 * Math.sqrt(zoom), 0.9);
+            chart.setOption({series: [
+              {symbolSize: newSz, itemStyle: {color: 'rgba(13,59,59,' + newOp + ')'}},
+              {symbolSize: newSz, itemStyle: {color: 'rgba(232,132,92,' + newOp + ')'}}
+            ]});
+          }, 150);
+        });
+      }
+
+      function renderBoxPlot(catCol, numCol, flipped) {
+        var oGroups = origBox[catCol] && origBox[catCol][numCol];
+        var sGroups = synBox[catCol] && synBox[catCol][numCol];
+        if (!oGroups && !sGroups) {
+          msgEl.textContent = 'No box plot data for this pair.';
+          msgEl.classList.remove('hidden');
+          chart.clear();
+          return;
+        }
+        oGroups = oGroups || [];
+        sGroups = sGroups || [];
+
+        var catSet = {};
+        var categories = [];
+        function addCats(groups) {
+          for (var i = 0; i < groups.length; i++) {
+            if (!catSet[groups[i].category]) { catSet[groups[i].category] = true; categories.push(groups[i].category); }
+          }
+        }
+        addCats(oGroups);
+        addCats(sGroups);
+
+        var oMap = {}, sMap = {};
+        for (var i = 0; i < oGroups.length; i++) oMap[oGroups[i].category] = oGroups[i];
+        for (var j = 0; j < sGroups.length; j++) sMap[sGroups[j].category] = sGroups[j];
+
+        function toBox(map) {
+          return categories.map(function(c) {
+            var g = map[c];
+            return g ? [g.min, g.q1, g.median, g.q3, g.max] : [0,0,0,0,0];
+          });
+        }
+
+        function collectOutliers(map, flipped) {
+          var pts = [];
+          for (var i = 0; i < categories.length; i++) {
+            var g = map[categories[i]];
+            if (g && g.outliers) {
+              for (var j = 0; j < g.outliers.length; j++) {
+                pts.push(flipped ? [g.outliers[j], i] : [i, g.outliers[j]]);
+              }
+            }
+          }
+          return pts;
+        }
+
+        var nCats = categories.length;
+        var dynHeight = Math.max(500, nCats * 40 + 120);
+        chartDom.style.height = dynHeight + 'px';
+        chart.resize();
+
+        var catRotate = flipped ? 0 : (nCats > 10 ? 45 : 0);
+        var catAxis = {type: 'category', data: categories, axisLabel: {fontSize: 11, rotate: catRotate, interval: 0}};
+        var valAxis = {type: 'value', name: numCol, nameLocation: 'center', nameGap: 45, nameTextStyle: {fontSize: 12, fontWeight: 'bold'}};
+        var gridLeft = flipped ? '18%' : '12%';
+
+        chart.setOption({
+          title: {text: catCol + '  ×  ' + numCol, left: 'center', textStyle: {fontSize: 13}},
+          legend: {data: ['Original', 'Synthetic'], top: '2%', right: 10},
+          tooltip: {trigger: 'item'},
+          grid: {left: gridLeft, right: '5%', bottom: '10%', top: '12%'},
+          xAxis: flipped ? valAxis : catAxis,
+          yAxis: flipped ? catAxis : valAxis,
+          series: [
+            {name: 'Original', type: 'boxplot', data: toBox(oMap), itemStyle: {color: '#e8f4f2', borderColor: '#0d3b3b'}},
+            {name: 'Original', type: 'scatter', data: collectOutliers(oMap, flipped), symbolSize: 4, itemStyle: {color: 'rgba(13,59,59,0.6)'}},
+            {name: 'Synthetic', type: 'boxplot', data: toBox(sMap), itemStyle: {color: '#fce8df', borderColor: '#e8845c'}},
+            {name: 'Synthetic', type: 'scatter', data: collectOutliers(sMap, flipped), symbolSize: 4, itemStyle: {color: 'rgba(232,132,92,0.6)'}}
+          ]
+        }, true);
+      }
+
+      selX.addEventListener('change', function() { updateYOptions(); renderInteraction(); });
+      selY.addEventListener('change', renderInteraction);
+      updateYOptions();
+      renderInteraction();
+      window.addEventListener('resize', function() { if (chart) chart.resize(); });
+    })();
+    </script>
+    {% endif %}
+
+    {# ── Correlation Comparison ── #}
+    {% if correlation_charts %}
     <section>
       <h2 class="text-lg font-semibold text-brand-teal mb-4 flex items-center gap-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
-        Correlation Diffs
-        <span class="text-xs font-normal text-gray-400">(original − synthetic)</span>
+        Correlations
       </h2>
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="flex gap-2 px-6 pt-4" id="corr-tabs">
-          {% for chart in correlation_diff_charts %}
+        {# Method tabs (Pearson, Spearman, etc.) #}
+        <div class="flex gap-2 px-6 pt-4" id="corr-method-tabs">
+          {% for chart in correlation_charts %}
           <button class="tab-btn px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:border-brand-teal hover:text-brand-teal{% if loop.first %} active{% endif %}"
-                  onclick="switchCorrTab('{{ chart.div_id }}', this)">{{ chart.name }}</button>
+                  onclick="switchCorrMethod('{{ chart.method }}', this)">{{ chart.name }}</button>
           {% endfor %}
         </div>
-        {% for chart in correlation_diff_charts %}
-        <div class="corr-panel p-6{% if not loop.first %} hidden{% endif %}" id="panel-{{ chart.div_id }}">
-          {{ chart.chart_html | safe }}
+        {% for chart in correlation_charts %}
+        <div class="corr-method-panel{% if not loop.first %} hidden{% endif %}" id="corr-method-{{ chart.method }}">
+          {# Sub-tabs: Original / Synthetic / Diff #}
+          <div class="flex gap-2 px-6 pt-3" id="corr-sub-tabs-{{ chart.method }}">
+            <button class="corr-sub-btn px-3 py-1 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-brand-teal hover:text-brand-teal active"
+                    onclick="switchCorrSub('{{ chart.method }}', 'orig', this)">Original</button>
+            <button class="corr-sub-btn px-3 py-1 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-brand-teal hover:text-brand-teal"
+                    onclick="switchCorrSub('{{ chart.method }}', 'syn', this)">Synthetic</button>
+            <button class="corr-sub-btn px-3 py-1 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-brand-teal hover:text-brand-teal"
+                    onclick="switchCorrSub('{{ chart.method }}', 'diff', this)">Diff</button>
+          </div>
+          <div class="corr-sub-panel p-6" id="corr-{{ chart.method }}-orig">
+            {{ chart.original_html | safe }}
+          </div>
+          <div class="corr-sub-panel p-6 hidden" id="corr-{{ chart.method }}-syn">
+            {{ chart.synthetic_html | safe }}
+          </div>
+          <div class="corr-sub-panel p-6 hidden" id="corr-{{ chart.method }}-diff">
+            {{ chart.diff_html | safe }}
+          </div>
         </div>
         {% endfor %}
       </div>
@@ -262,7 +573,8 @@
   {# ── JS ── #}
   <script>
     function initChart(el) {
-      if (el._echartInit) return;
+      var instance = echarts.getInstanceByDom(el);
+      if (instance) { instance.resize(); return; }
       var raw = el.getAttribute('data-option');
       if (!raw) return;
       var opt = JSON.parse(raw);
@@ -283,7 +595,6 @@
         if (opt.yAxis) opt.yAxis.axisLabel = {formatter: function(v){return v+'%';}};
       }
       echarts.init(el).setOption(opt);
-      el._echartInit = true;
     }
     function initChartsIn(container) {
       container.querySelectorAll('.echart-lazy').forEach(initChart);
@@ -295,11 +606,22 @@
       var panel = document.getElementById('panel-' + idx);
       if (panel) { panel.classList.add('active'); initChartsIn(panel); }
     }
-    function switchCorrTab(divId, btn) {
-      document.querySelectorAll('#corr-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.corr-panel').forEach(p => p.classList.add('hidden'));
+    function switchCorrMethod(method, btn) {
+      document.querySelectorAll('#corr-method-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.corr-method-panel').forEach(p => p.classList.add('hidden'));
       btn.classList.add('active');
-      var panel = document.getElementById('panel-' + divId);
+      var panel = document.getElementById('corr-method-' + method);
+      if (panel) {
+        panel.classList.remove('hidden');
+        panel.querySelectorAll('.corr-sub-panel:not(.hidden)').forEach(initChartsIn);
+      }
+    }
+    function switchCorrSub(method, sub, btn) {
+      var parent = document.getElementById('corr-method-' + method);
+      parent.querySelectorAll('.corr-sub-btn').forEach(b => b.classList.remove('active'));
+      parent.querySelectorAll('.corr-sub-panel').forEach(p => p.classList.add('hidden'));
+      btn.classList.add('active');
+      var panel = document.getElementById('corr-' + method + '-' + sub);
       if (panel) { panel.classList.remove('hidden'); initChartsIn(panel); }
     }
     function toggleStats(btn) {
@@ -311,7 +633,7 @@
       btn.textContent = showing ? 'Show ' + n + ' more ▾' : 'Show less ▴';
     }
     document.addEventListener('DOMContentLoaded', function() {
-      document.querySelectorAll('.tab-panel.active, .corr-panel:not(.hidden)').forEach(initChartsIn);
+      document.querySelectorAll('.tab-panel.active, .corr-sub-panel:not(.hidden)').forEach(initChartsIn);
     });
   </script>
 

@@ -10,7 +10,10 @@ from dataxid_syntheval._diff import (
     compute_alert_diff,
     compute_column_diffs,
     compute_correlation_diffs,
+    compute_correlation_matrices,
     compute_distribution_overlays,
+    compute_interaction_overlays,
+    compute_overview_diff,
 )
 from dataxid_syntheval._ingest import ingest
 from dataxid_syntheval._report._html import render_html
@@ -65,17 +68,20 @@ class SynthEval:
     def diff(self) -> dict[str, Any]:
         """Lazily computed comparison results.
 
-        Returns a dict with keys: column_diffs, alert_diff,
-        distribution_overlays, correlation_diffs.
+        Returns a dict with keys: overview_diff, column_diffs, alert_diff,
+        distribution_overlays, correlation_diffs, interaction_overlays.
         """
         if self._diff_cache is None:
             orig = self._original_report
             syn = self._synthetic_report
             self._diff_cache = {
+                "overview_diff": compute_overview_diff(orig, syn),
                 "column_diffs": compute_column_diffs(orig, syn),
                 "alert_diff": compute_alert_diff(orig, syn),
                 "distribution_overlays": compute_distribution_overlays(orig, syn),
                 "correlation_diffs": compute_correlation_diffs(orig, syn),
+                "correlation_matrices": compute_correlation_matrices(orig, syn),
+                "interaction_overlays": compute_interaction_overlays(orig, syn),
             }
         return self._diff_cache
 
@@ -89,10 +95,13 @@ class SynthEval:
         html = render_html(
             title=self._config.title,
             version=__version__,
+            overview_diff=d["overview_diff"],
             column_diffs=d["column_diffs"],
             alert_diff=d["alert_diff"],
             distribution_overlays=d["distribution_overlays"],
             correlation_diffs=d["correlation_diffs"],
+            correlation_matrices=d["correlation_matrices"],
+            interaction_overlays=d["interaction_overlays"],
             original_stats=self._original_report.stats,
             synthetic_stats=self._synthetic_report.stats,
             original_rows=self._original_report.df.height,
