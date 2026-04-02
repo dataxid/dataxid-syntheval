@@ -331,6 +331,7 @@ source = { editable = "." }
 dependencies = [
     { name = "dataxid-profiling" },
     { name = "jinja2" },
+    { name = "polars" },
 ]
 
 [package.dev-dependencies]
@@ -344,6 +345,7 @@ dev = [
 requires-dist = [
     { name = "dataxid-profiling", specifier = ">=0.3" },
     { name = "jinja2", specifier = ">=3.1" },
+    { name = "polars", specifier = ">=1.0" },
 ]
 
 [package.metadata.requires-dev]

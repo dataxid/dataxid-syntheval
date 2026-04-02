@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 __version__ = "0.1.0"
 
-__all__ = ["SynthEval", "SynthEvalConfig"]
+__all__ = ["SynthEval", "SynthEvalConfig", "__version__"]
 
 
 class SynthEval:
