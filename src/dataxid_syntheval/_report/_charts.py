@@ -34,6 +34,21 @@ def _short_number(val: float | int | str) -> str:
     return f"{v:.2f}"
 
 
+def _nice_y_max(peak: float) -> float:
+    """Round Y-axis max up to a clean value with ~50% headroom above peak.
+
+    This prevents small differences from being visually exaggerated.
+    """
+    if peak <= 0:
+        return 10.0
+    target = peak * 1.15
+    steps = [1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100]
+    for s in steps:
+        if s >= target:
+            return float(s)
+    return float(int(target / 10 + 1) * 10)
+
+
 def _side_by_side_option(
     labels: list[str],
     orig_pcts: list[float],
@@ -47,6 +62,9 @@ def _side_by_side_option(
     n = len(labels)
     rotate = 45 if n > 10 else (30 if n > 5 else 0)
     max_width = 24 if n > 15 else (36 if n > 8 else 50)
+
+    peak = max(max(orig_pcts, default=0), max(syn_pcts, default=0))
+    y_max = _nice_y_max(peak)
 
     def _series_data(pcts: list[float], counts: list[int] | None) -> list[Any]:
         if counts is None:
@@ -65,6 +83,7 @@ def _side_by_side_option(
         },
         "yAxis": {
             "type": "value",
+            "max": y_max,
             "axisLabel": {"formatter": "{value}%"},
         },
         "barGap": "5%",
@@ -82,6 +101,24 @@ def _side_by_side_option(
                 "type": "bar",
                 "data": _series_data(syn_pcts, syn_counts),
                 "itemStyle": {"color": BRAND_CORAL},
+            },
+            {
+                "name": "Original",
+                "type": "line",
+                "data": orig_pcts,
+                "smooth": True,
+                "symbol": "none",
+                "lineStyle": {"color": BRAND_TEAL, "width": 2},
+                "tooltip": {"show": False},
+            },
+            {
+                "name": "Synthetic",
+                "type": "line",
+                "data": syn_pcts,
+                "smooth": True,
+                "symbol": "none",
+                "lineStyle": {"color": BRAND_CORAL, "width": 2},
+                "tooltip": {"show": False},
             },
         ],
     }
