@@ -82,3 +82,31 @@ def original_report() -> ProfileReport:
 @pytest.fixture(scope="session")
 def synthetic_report() -> ProfileReport:
     return ProfileReport(_make_synthetic_df(), title="Synthetic")
+
+
+def _make_holdout_df() -> pl.DataFrame:
+    """100-row DataFrame simulating holdout data — same distribution as original."""
+    rng = random.Random(7)
+    n = 100
+    ages: list[int | None] = [rng.randint(18, 65) for _ in range(n)]
+    incomes: list[float | None] = [round(rng.gauss(55_000, 15_000), 2) for _ in range(n)]
+    cities: list[str | None] = [
+        rng.choice(["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya"]) for _ in range(n)
+    ]
+    genders = [rng.choice(["M", "F"]) for _ in range(n)]
+    is_active = [rng.choice([True, False]) for _ in range(n)]
+    ages[8] = None
+    incomes[15] = None
+    cities[30] = None
+    return pl.DataFrame({
+        "age": pl.Series(ages, dtype=pl.Int64),
+        "income": pl.Series(incomes, dtype=pl.Float64),
+        "city": cities,
+        "gender": genders,
+        "is_active": is_active,
+    })
+
+
+@pytest.fixture
+def holdout_df() -> pl.DataFrame:
+    return _make_holdout_df()

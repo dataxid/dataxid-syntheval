@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-06-23
+
+### Added
+
+- `SynthEval.scores` property: holdout-based fidelity & privacy quality assessment
+- Fidelity scoring: univariate/bivariate TVD accuracy with per-column breakdown
+- Privacy scoring: DCR share, IMS, NNDR ratio (L2 distance in continuous embedding space)
+- `_encode_privacy` pipeline: QuantileTransformer + Model2Vec (potion-base-8M) + PCA
+- Bundled potion-base-8M static embedder for categorical feature encoding
+- `SynthEvalConfig` fields: `scoring`, `n_bins`, `max_sample_size`, `max_bivariate_pairs`
+- `holdout` parameter on `SynthEval.__init__`
+- `THIRD_PARTY_LICENSES` file for bundled assets attribution
+
 ## [0.1.0] - 2026-03-29
 
 ### Added

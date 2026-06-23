@@ -29,6 +29,34 @@ diffs["distribution_overlays"] # histogram & frequency overlays
 diffs["correlation_diffs"]     # correlation matrix differences
 ```
 
+## Quality Scores
+
+Compute fidelity and privacy metrics with a holdout dataset:
+
+```python
+import polars as pl
+from dataxid_syntheval import SynthEval
+
+original = pl.read_csv("train.csv")
+synthetic = pl.read_csv("synthetic.csv")
+holdout = pl.read_csv("holdout.csv")
+
+se = SynthEval(original=original, synthetic=synthetic, holdout=holdout)
+
+scores = se.scores
+scores.fidelity                    # overall fidelity (%)
+scores.fidelity_detail.univariate  # univariate accuracy (%)
+scores.fidelity_detail.bivariate   # bivariate accuracy (%)
+scores.fidelity_detail.per_column  # per-column breakdown
+
+scores.privacy.dcr_share           # DCR share
+scores.privacy.ims_training        # identical match share
+scores.privacy.nndr_ratio          # NNDR ratio
+scores.privacy.assessments         # descriptive text assessments
+```
+
+Privacy metrics require a holdout dataset. Without holdout, `se.scores.privacy` is `None`.
+
 ## Features
 
 - **Column-level stat comparison** — mean, std, median, min/max, missing %, distinct count and more

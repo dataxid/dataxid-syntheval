@@ -146,3 +146,51 @@ class TestSynthEvalToHtml:
         assert "echarts.init" in html
         assert "Original" in html
         assert "Synthetic" in html
+
+
+class TestSynthEvalScores:
+    def test_scores_with_holdout(
+        self, original_df: pl.DataFrame, synthetic_df: pl.DataFrame, holdout_df: pl.DataFrame
+    ):
+        se = SynthEval(original=original_df, synthetic=synthetic_df, holdout=holdout_df)
+        assert se.scores is not None
+        assert 0.0 <= se.scores.fidelity <= 100.0
+        assert se.scores.privacy is not None
+        assert len(se.scores.privacy.assessments) == 3
+
+    def test_scores_without_holdout(
+        self, original_df: pl.DataFrame, synthetic_df: pl.DataFrame
+    ):
+        se = SynthEval(original=original_df, synthetic=synthetic_df)
+        assert se.scores is not None
+        assert 0.0 <= se.scores.fidelity <= 100.0
+        assert se.scores.privacy is None
+
+    def test_scores_disabled(
+        self, original_df: pl.DataFrame, synthetic_df: pl.DataFrame, holdout_df: pl.DataFrame
+    ):
+        se = SynthEval(
+            original=original_df, synthetic=synthetic_df, holdout=holdout_df, scoring=False
+        )
+        assert se.scores is None
+
+    def test_scores_cached(
+        self, original_df: pl.DataFrame, synthetic_df: pl.DataFrame, holdout_df: pl.DataFrame
+    ):
+        se = SynthEval(original=original_df, synthetic=synthetic_df, holdout=holdout_df)
+        s1 = se.scores
+        s2 = se.scores
+        assert s1 is s2
+
+    def test_holdout_parameter_accepted(
+        self, original_df: pl.DataFrame, synthetic_df: pl.DataFrame, holdout_df: pl.DataFrame
+    ):
+        se = SynthEval(original=original_df, synthetic=synthetic_df, holdout=holdout_df)
+        assert se.scores.privacy is not None
+
+    def test_existing_api_unchanged(
+        self, original_df: pl.DataFrame, synthetic_df: pl.DataFrame
+    ):
+        se = SynthEval(original=original_df, synthetic=synthetic_df)
+        assert isinstance(se.diff, dict)
+        assert "column_diffs" in se.diff
