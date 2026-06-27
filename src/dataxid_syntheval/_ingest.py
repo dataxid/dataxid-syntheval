@@ -18,7 +18,9 @@ def ingest(source: Any, config: SynthEvalConfig) -> ProfileReport:
         return source
 
     if isinstance(source, pl.DataFrame):
-        return ProfileReport(source, mode=config.mode)
+        return ProfileReport(
+            source, mode=config.mode, n_top_values=config.n_top_values
+        )
 
     type_name = type(source).__qualname__
     msg = (

@@ -66,3 +66,17 @@ class TestScoringConfig:
     def test_max_bivariate_pairs_none_allowed(self):
         cfg = SynthEvalConfig(max_bivariate_pairs=None)
         assert cfg.max_bivariate_pairs is None
+
+
+class TestNTopValues:
+    def test_default(self):
+        config = SynthEvalConfig()
+        assert config.n_top_values == 50
+
+    def test_custom(self):
+        config = SynthEvalConfig(n_top_values=10)
+        assert config.n_top_values == 10
+
+    def test_rejects_below_one(self):
+        with pytest.raises(ValueError, match="n_top_values must be >= 1"):
+            SynthEvalConfig(n_top_values=0)

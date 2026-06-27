@@ -16,6 +16,7 @@ class SynthEvalConfig:
     n_bins: int = 10
     max_sample_size: int = 5000
     max_bivariate_pairs: int | None = None
+    n_top_values: int = 50
 
     def __post_init__(self) -> None:
         if self.mode not in VALID_MODES:
@@ -29,4 +30,7 @@ class SynthEvalConfig:
             raise ValueError(msg)
         if self.max_bivariate_pairs is not None and self.max_bivariate_pairs < 1:
             msg = f"max_bivariate_pairs must be >= 1 or None, got {self.max_bivariate_pairs}"
+            raise ValueError(msg)
+        if self.n_top_values < 1:
+            msg = f"n_top_values must be >= 1, got {self.n_top_values}"
             raise ValueError(msg)

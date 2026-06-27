@@ -245,6 +245,103 @@ class TestDistributionOverlaysCategorical:
             assert item["synthetic"] >= 0
 
 
+class TestCategoricalOverlayOther:
+    def _stats(self, top, other, count, missing):
+        return {
+            "column_type": "CATEGORICAL",
+            "count": count,
+            "missing_count": missing,
+            "top_values": top,
+            "other_values": other,
+        }
+
+    def test_other_bucket_added(self):
+        from dataxid_syntheval._diff import _categorical_frequency_overlay
+
+        orig = self._stats(
+            top=[{"value": "a", "count": 5}, {"value": "b", "count": 3}],
+            other={"count": 2, "distinct_remaining": 4},
+            count=10, missing=0,
+        )
+        syn = self._stats(
+            top=[{"value": "a", "count": 6}, {"value": "b", "count": 2}],
+            other={"count": 2, "distinct_remaining": 3},
+            count=10, missing=0,
+        )
+        overlay = _categorical_frequency_overlay(orig, syn)
+        other_rows = [r for r in overlay if r["value"] == "Other"]
+        assert len(other_rows) == 1
+        row = other_rows[0]
+        assert row["original_count"] == 2
+        assert row["synthetic_count"] == 2
+        assert row["original"] == pytest.approx(20.0)
+
+    def test_no_other_bucket_when_absent(self):
+        from dataxid_syntheval._diff import _categorical_frequency_overlay
+
+        orig = self._stats(
+            top=[{"value": "a", "count": 6}, {"value": "b", "count": 4}],
+            other=None, count=10, missing=0,
+        )
+        syn = self._stats(
+            top=[{"value": "a", "count": 5}, {"value": "b", "count": 5}],
+            other=None, count=10, missing=0,
+        )
+        overlay = _categorical_frequency_overlay(orig, syn)
+        assert all(r["value"] != "Other" for r in overlay)
+
+    def test_percentages_use_non_missing_denominator(self):
+        from dataxid_syntheval._diff import _categorical_frequency_overlay
+
+        orig = self._stats(
+            top=[{"value": "a", "count": 8}],
+            other={"count": 2, "distinct_remaining": 5},
+            count=12, missing=2,
+        )
+        syn = self._stats(
+            top=[{"value": "a", "count": 9}],
+            other={"count": 1, "distinct_remaining": 3},
+            count=11, missing=1,
+        )
+        overlay = _categorical_frequency_overlay(orig, syn)
+        a_row = next(r for r in overlay if r["value"] == "a")
+        assert a_row["original"] == pytest.approx(80.0)
+
+    def test_other_bucket_one_sided(self):
+        from dataxid_syntheval._diff import _categorical_frequency_overlay
+
+        orig = self._stats(
+            top=[{"value": "a", "count": 7}],
+            other={"count": 3, "distinct_remaining": 2},
+            count=10, missing=0,
+        )
+        syn = self._stats(
+            top=[{"value": "a", "count": 10}],
+            other=None, count=10, missing=0,
+        )
+        overlay = _categorical_frequency_overlay(orig, syn)
+        other = next(r for r in overlay if r["value"] == "Other")
+        assert other["original_count"] == 3
+        assert other["synthetic_count"] == 0
+        assert other["synthetic"] == pytest.approx(0.0)
+
+    def test_no_other_bucket_when_count_zero(self):
+        from dataxid_syntheval._diff import _categorical_frequency_overlay
+
+        orig = self._stats(
+            top=[{"value": "a", "count": 10}],
+            other={"count": 0, "distinct_remaining": 0},
+            count=10, missing=0,
+        )
+        syn = self._stats(
+            top=[{"value": "a", "count": 10}],
+            other={"count": 0, "distinct_remaining": 0},
+            count=10, missing=0,
+        )
+        overlay = _categorical_frequency_overlay(orig, syn)
+        assert all(r["value"] != "Other" for r in overlay)
+
+
 class TestDistributionOverlaysEdgeCases:
     def test_boolean_excluded(
         self, original_report: ProfileReport, synthetic_report: ProfileReport

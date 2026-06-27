@@ -282,7 +282,12 @@ def _categorical_frequency_overlay(
     orig: dict[str, Any],
     syn: dict[str, Any],
 ) -> list[dict[str, Any]] | None:
-    """Merge top-value frequencies into [{value, original, synthetic}]."""
+    """Merge top-value frequencies into [{value, original, synthetic}].
+
+    Adds an aligned "Other" bucket from each side's other_values rollup so the
+    long tail is represented. Percentages use non-missing row counts as the
+    denominator so they stay truthful when a tail exists.
+    """
     orig_top = orig.get("top_values", [])
     syn_top = syn.get("top_values", [])
     if not orig_top and not syn_top:
@@ -293,10 +298,11 @@ def _categorical_frequency_overlay(
     all_values = list(dict.fromkeys(
         [v["value"] for v in orig_top] + [v["value"] for v in syn_top]
     ))
-    orig_total = sum(orig_map.values()) or 1
-    syn_total = sum(syn_map.values()) or 1
 
-    return [
+    orig_total = max(_non_missing_count(orig), 1)
+    syn_total = max(_non_missing_count(syn), 1)
+
+    rows = [
         {
             "value": val,
             "original": round(orig_map.get(val, 0) / orig_total * 100, 2),
@@ -306,6 +312,32 @@ def _categorical_frequency_overlay(
         }
         for val in all_values
     ]
+
+    orig_other = _other_count(orig)
+    syn_other = _other_count(syn)
+    if orig_other > 0 or syn_other > 0:
+        rows.append({
+            "value": "Other",
+            "original": round(orig_other / orig_total * 100, 2),
+            "synthetic": round(syn_other / syn_total * 100, 2),
+            "original_count": orig_other,
+            "synthetic_count": syn_other,
+        })
+
+    return rows
+
+
+def _non_missing_count(stats: dict[str, Any]) -> int:
+    count = stats.get("count", 0) or 0
+    missing = stats.get("missing_count", 0) or 0
+    return count - missing
+
+
+def _other_count(stats: dict[str, Any]) -> int:
+    other = stats.get("other_values")
+    if not other:
+        return 0
+    return int(other.get("count", 0) or 0)
 
 
 # -- Correlation matrix diff --------------------------------------------------

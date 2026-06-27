@@ -61,3 +61,15 @@ class TestInvalidInput:
         config = SynthEvalConfig()
         with pytest.raises(TypeError, match="Unsupported input type"):
             ingest("data.csv", config)
+
+
+class TestNTopValuesPropagation:
+    def test_n_top_values_reaches_profile_report(self, original_df: pl.DataFrame):
+        config = SynthEvalConfig(n_top_values=7)
+        result = ingest(original_df, config)
+        assert result.config.n_top_values == 7
+
+    def test_default_n_top_values_propagated(self, original_df: pl.DataFrame):
+        config = SynthEvalConfig()
+        result = ingest(original_df, config)
+        assert result.config.n_top_values == 50
