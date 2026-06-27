@@ -25,12 +25,17 @@ def compute_scores(
     training: pl.DataFrame,
     synthetic: pl.DataFrame,
     holdout: pl.DataFrame | None,
-    n_bins: int,
+    n_bins_univariate: int,
+    n_bins_bivariate: int,
     max_sample_size: int,
     max_bivariate_pairs: int | None,
 ) -> ScoreResult:
     disc = discretize_dataframes(
-        training=training, synthetic=synthetic, holdout=holdout, n_bins=n_bins
+        training=training,
+        synthetic=synthetic,
+        holdout=holdout,
+        n_bins_univariate=n_bins_univariate,
+        n_bins_bivariate=n_bins_bivariate,
     )
 
     fidelity_detail = compute_fidelity(disc, max_bivariate_pairs=max_bivariate_pairs)

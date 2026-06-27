@@ -90,7 +90,8 @@ class SynthEval:
                 training=self._original_report.df,
                 synthetic=self._synthetic_report.df,
                 holdout=self._holdout_df,
-                n_bins=self._config.n_bins,
+                n_bins_univariate=self._config.n_bins_univariate,
+                n_bins_bivariate=self._config.n_bins_bivariate,
                 max_sample_size=self._config.max_sample_size,
                 max_bivariate_pairs=self._config.max_bivariate_pairs,
             )

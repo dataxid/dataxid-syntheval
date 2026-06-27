@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Literal
 
@@ -13,7 +14,9 @@ class SynthEvalConfig:
     title: str = "SynthEval Report"
     mode: Literal["complete", "overview"] = "complete"
     scoring: bool = True
-    n_bins: int = 10
+    n_bins: int | None = None  # deprecated: use n_bins_univariate / n_bins_bivariate
+    n_bins_univariate: int = 100
+    n_bins_bivariate: int = 10
     max_sample_size: int = 5000
     max_bivariate_pairs: int | None = None
     n_top_values: int = 50
@@ -22,8 +25,22 @@ class SynthEvalConfig:
         if self.mode not in VALID_MODES:
             msg = f"mode must be one of {VALID_MODES}, got '{self.mode}'"
             raise ValueError(msg)
-        if self.n_bins < 2:
-            msg = f"n_bins must be >= 2, got {self.n_bins}"
+        if self.n_bins is not None:
+            warnings.warn(
+                "n_bins is deprecated; use n_bins_univariate and n_bins_bivariate.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if self.n_bins < 2:
+                msg = f"n_bins must be >= 2, got {self.n_bins}"
+                raise ValueError(msg)
+            object.__setattr__(self, "n_bins_univariate", self.n_bins)
+            object.__setattr__(self, "n_bins_bivariate", self.n_bins)
+        if self.n_bins_univariate < 2:
+            msg = f"n_bins_univariate must be >= 2, got {self.n_bins_univariate}"
+            raise ValueError(msg)
+        if self.n_bins_bivariate < 2:
+            msg = f"n_bins_bivariate must be >= 2, got {self.n_bins_bivariate}"
             raise ValueError(msg)
         if self.max_sample_size < 1:
             msg = f"max_sample_size must be >= 1, got {self.max_sample_size}"

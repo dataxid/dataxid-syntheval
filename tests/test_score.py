@@ -26,7 +26,8 @@ class TestScoreOrchestration:
         training, synthetic, holdout = self._make_dfs()
         result = compute_scores(
             training=training, synthetic=synthetic, holdout=holdout,
-            n_bins=10, max_sample_size=200, max_bivariate_pairs=None,
+            n_bins_univariate=100, n_bins_bivariate=10,
+            max_sample_size=200, max_bivariate_pairs=None,
         )
         assert isinstance(result, ScoreResult)
 
@@ -34,7 +35,8 @@ class TestScoreOrchestration:
         training, synthetic, holdout = self._make_dfs()
         result = compute_scores(
             training=training, synthetic=synthetic, holdout=holdout,
-            n_bins=10, max_sample_size=200, max_bivariate_pairs=None,
+            n_bins_univariate=100, n_bins_bivariate=10,
+            max_sample_size=200, max_bivariate_pairs=None,
         )
         assert 0.0 <= result.fidelity <= 100.0
 
@@ -42,7 +44,8 @@ class TestScoreOrchestration:
         training, synthetic, holdout = self._make_dfs()
         result = compute_scores(
             training=training, synthetic=synthetic, holdout=holdout,
-            n_bins=10, max_sample_size=200, max_bivariate_pairs=None,
+            n_bins_univariate=100, n_bins_bivariate=10,
+            max_sample_size=200, max_bivariate_pairs=None,
         )
         assert result.overall == result.fidelity
 
@@ -50,7 +53,8 @@ class TestScoreOrchestration:
         training, synthetic, holdout = self._make_dfs()
         result = compute_scores(
             training=training, synthetic=synthetic, holdout=holdout,
-            n_bins=10, max_sample_size=200, max_bivariate_pairs=None,
+            n_bins_univariate=100, n_bins_bivariate=10,
+            max_sample_size=200, max_bivariate_pairs=None,
         )
         assert result.privacy is not None
         assert len(result.privacy.assessments) == 3
@@ -59,7 +63,8 @@ class TestScoreOrchestration:
         training, synthetic, _ = self._make_dfs()
         result = compute_scores(
             training=training, synthetic=synthetic, holdout=None,
-            n_bins=10, max_sample_size=200, max_bivariate_pairs=None,
+            n_bins_univariate=100, n_bins_bivariate=10,
+            max_sample_size=200, max_bivariate_pairs=None,
         )
         assert result.privacy is None
 
@@ -67,7 +72,8 @@ class TestScoreOrchestration:
         training, synthetic, holdout = self._make_dfs()
         result = compute_scores(
             training=training, synthetic=synthetic, holdout=holdout,
-            n_bins=10, max_sample_size=200, max_bivariate_pairs=None,
+            n_bins_univariate=100, n_bins_bivariate=10,
+            max_sample_size=200, max_bivariate_pairs=None,
         )
         assert result.fidelity_detail.univariate > 0
         assert result.fidelity_detail.bivariate > 0
