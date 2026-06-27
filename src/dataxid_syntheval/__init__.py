@@ -25,7 +25,7 @@ from dataxid_syntheval._score import ScoreResult, compute_scores
 if TYPE_CHECKING:
     from dataxid_profiling import ProfileReport
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "SynthEval",

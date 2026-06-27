@@ -1,6 +1,6 @@
 [project]
 name = "dataxid-syntheval"
-version = "0.2.0"
+version = "0.3.0"
 description = "Synthetic data quality evaluation with Polars-native performance and interactive HTML reports."
 readme = "README.md"
 requires-python = ">=3.10"

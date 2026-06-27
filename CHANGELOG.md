@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-27
+
+### Changed
+
+- Fidelity scoring now uses quantile (equal-frequency) binning for numeric columns. Equal-width binning previously inflated fidelity on skewed or outlier-heavy columns; quantile binning reflects true distribution differences.
+- Binning cardinality is now per interaction level, using finer bins for univariate than for bivariate comparison.
+- Out-of-range synthetic values and rare categories are grouped into an explicit `(other)` bucket; missing values remain a separate bucket.
+
+### Added
+
+- `SynthEvalConfig` fields: `n_bins_univariate`, `n_bins_bivariate`
+
+### Deprecated
+
+- `SynthEvalConfig.n_bins` — use `n_bins_univariate` / `n_bins_bivariate` instead. When set, it applies to both levels and emits a `DeprecationWarning`.
+
+### Fixed
+
+- Categorical distribution overlays now represent the long tail with an aligned "Other" bucket and use non-missing row counts for truthful percentages.
+
 ## [0.2.0] - 2026-06-23
 
 ### Added
