@@ -353,7 +353,7 @@ wheels = [
 
 [[package]]
 name = "dataxid-profiling"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
@@ -363,9 +363,9 @@ dependencies = [
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/51/272867e4aca0e87505e89d75a89abf8e6a3c6d1417df1484ddba686c85a6/dataxid_profiling-0.3.0.tar.gz", hash = "sha256:042ed10748522c8fbca23f2a82904309d741d5d3ac3ac96cc6d42c77fd8c0b0f", size = 753859, upload-time = "2026-03-28T09:27:48.007Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/df/01/a81f2993e1aea9e59bbefe82a5aca366f6416b04a2fdaf3922bd653e12ca/dataxid_profiling-0.4.0.tar.gz", hash = "sha256:fa9b9e6dca48fafd3aff8497261116cca0ab6cbf50d86564db68ade243459aad", size = 758183, upload-time = "2026-08-06T08:17:30.524Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/5d/df5b44ed74fed4bf459b155c92a96e3ca004557d62f94e04462de8a11226/dataxid_profiling-0.3.0-py3-none-any.whl", hash = "sha256:8c1d7c8c7f8acd78da30c1842a51be495c1b8a21a261a4597855bcdcc778861b", size = 104321, upload-time = "2026-03-28T09:27:49.925Z" },
+    { url = "https://files.pythonhosted.org/packages/26/44/cbab2190fb9209b1abb2d3504165f8d4f9674f8ec7ac9ad5704879577b8d/dataxid_profiling-0.4.0-py3-none-any.whl", hash = "sha256:74f28e9b0aae786660ff36598c64020cefc5f0a454a167e982ac6a0ee0b54a00", size = 107044, upload-time = "2026-08-06T08:17:28.735Z" },
 ]
 
 [[package]]
@@ -390,7 +390,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dataxid-profiling", specifier = ">=0.3" },
+    { name = "dataxid-profiling", specifier = ">=0.4" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "model2vec", specifier = ">=0.3" },
     { name = "polars", specifier = ">=1.0" },
