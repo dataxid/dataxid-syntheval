@@ -42,7 +42,7 @@ class TestScoringConfig:
     def test_default_scoring_enabled(self):
         cfg = SynthEvalConfig()
         assert cfg.scoring is True
-        assert cfg.n_bins == 10
+        assert cfg.n_bins is None
         assert cfg.max_sample_size == 5000
         assert cfg.max_bivariate_pairs is None
 
@@ -66,3 +66,46 @@ class TestScoringConfig:
     def test_max_bivariate_pairs_none_allowed(self):
         cfg = SynthEvalConfig(max_bivariate_pairs=None)
         assert cfg.max_bivariate_pairs is None
+
+
+class TestNTopValues:
+    def test_default(self):
+        config = SynthEvalConfig()
+        assert config.n_top_values == 50
+
+    def test_custom(self):
+        config = SynthEvalConfig(n_top_values=10)
+        assert config.n_top_values == 10
+
+    def test_rejects_below_one(self):
+        with pytest.raises(ValueError, match="n_top_values must be >= 1"):
+            SynthEvalConfig(n_top_values=0)
+
+
+class TestPerLevelBins:
+    def test_defaults_match_paper(self):
+        cfg = SynthEvalConfig()
+        assert cfg.n_bins_univariate == 100
+        assert cfg.n_bins_bivariate == 10
+
+    def test_legacy_n_bins_applies_to_both_when_set(self):
+        with pytest.warns(DeprecationWarning):
+            cfg = SynthEvalConfig(n_bins=25)
+        assert cfg.n_bins_univariate == 25
+        assert cfg.n_bins_bivariate == 25
+
+    def test_legacy_n_bins_takes_precedence_over_explicit_per_level(self):
+        with pytest.warns(DeprecationWarning):
+            cfg = SynthEvalConfig(n_bins=25, n_bins_univariate=80)
+        assert cfg.n_bins_univariate == 25
+
+    def test_explicit_per_level_overrides_defaults(self):
+        cfg = SynthEvalConfig(n_bins_univariate=80, n_bins_bivariate=8)
+        assert cfg.n_bins_univariate == 80
+        assert cfg.n_bins_bivariate == 8
+
+    def test_rejects_per_level_below_two(self):
+        with pytest.raises(ValueError, match="n_bins_univariate must be >= 2"):
+            SynthEvalConfig(n_bins_univariate=1)
+        with pytest.raises(ValueError, match="n_bins_bivariate must be >= 2"):
+            SynthEvalConfig(n_bins_bivariate=1)

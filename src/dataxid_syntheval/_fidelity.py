@@ -27,20 +27,23 @@ class FidelityDetail:
 def compute_fidelity(
     disc: DiscretizedData, *, max_bivariate_pairs: int | None
 ) -> FidelityDetail:
-    columns = disc.training.columns
+    uni = disc.univariate
+    biv = disc.bivariate
+    columns = uni.training.columns
 
-    uni_scores = _univariate_accuracy(disc.training, disc.synthetic, columns)
+    uni_scores = _univariate_accuracy(uni.training, uni.synthetic, columns)
     univariate = _mean(list(uni_scores.values()))
 
-    pairs = _select_pairs(columns, max_bivariate_pairs)
-    bivariate = _bivariate_accuracy(disc.training, disc.synthetic, pairs)
+    pairs = _select_pairs(biv.training.columns, max_bivariate_pairs)
+    bivariate = _bivariate_accuracy(biv.training, biv.synthetic, pairs)
 
     univariate_max: float | None = None
     bivariate_max: float | None = None
-    if disc.holdout is not None:
-        hol_uni = _univariate_accuracy(disc.training, disc.holdout, columns)
+    if uni.holdout is not None:
+        hol_uni = _univariate_accuracy(uni.training, uni.holdout, columns)
         univariate_max = _mean(list(hol_uni.values()))
-        bivariate_max = _bivariate_accuracy(disc.training, disc.holdout, pairs)
+    if biv.holdout is not None:
+        bivariate_max = _bivariate_accuracy(biv.training, biv.holdout, pairs)
 
     return FidelityDetail(
         univariate=round(univariate, 2),

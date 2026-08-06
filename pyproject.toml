@@ -1,6 +1,6 @@
 [project]
 name = "dataxid-syntheval"
-version = "0.2.0"
+version = "0.3.0"
 description = "Synthetic data quality evaluation with Polars-native performance and interactive HTML reports."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "dataxid-profiling>=0.3",
+    "dataxid-profiling>=0.4",
     "jinja2>=3.1",
     "model2vec>=0.3",
     "polars>=1.0",
@@ -58,10 +58,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dataxid_syntheval"]
+exclude = ["**/__pycache__", "**/*.py[cod]"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/dataxid_syntheval/py.typed" = "dataxid_syntheval/py.typed"
-"src/dataxid_syntheval/assets" = "dataxid_syntheval/assets"
 
 [tool.ruff]
 target-version = "py310"
